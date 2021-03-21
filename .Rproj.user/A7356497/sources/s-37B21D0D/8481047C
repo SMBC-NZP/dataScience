@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1616335849846.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "8481047C",
+    "lastKnownWriteTime" : 1616335987,
+    "last_content_update" : 1616335987942,
+    "path" : "C:/Users/Guest user/gits/dataScience/man/hello.Rd",
+    "project_path" : "man/hello.Rd",
+    "properties" : {
+        "cursorPosition" : "12,0",
+        "scrollLine" : "0"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 2,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_doc"
+}
