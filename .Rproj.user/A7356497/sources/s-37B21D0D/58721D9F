@@ -1,0 +1,25 @@
+{
+    "collab_server" : "",
+    "contents" : "",
+    "created" : 1616343051377.000,
+    "dirty" : false,
+    "encoding" : "UTF-8",
+    "folds" : "",
+    "hash" : "0",
+    "id" : "58721D9F",
+    "lastKnownWriteTime" : 1616335585,
+    "last_content_update" : 1616335585,
+    "path" : "C:/Users/Guest user/gits/dataScience/inst/tutorials/tidy_data_exercise/tidy_data_exercise.Rmd",
+    "project_path" : "inst/tutorials/tidy_data_exercise/tidy_data_exercise.Rmd",
+    "properties" : {
+        "cursorPosition" : "121,38",
+        "scrollLine" : "105"
+    },
+    "read_only" : false,
+    "read_only_alternatives" : [
+    ],
+    "relative_order" : 5,
+    "source_on_save" : false,
+    "source_window" : "",
+    "type" : "r_markdown"
+}
