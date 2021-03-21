@@ -6,10 +6,8 @@ Author: Brian S. Evans
 Maintainer: evansbr@si.edu
 Description: 
     This package contains data and learnr tutorials for learning the essentials of data science with R.
-Imports:
-    tidyverse
-    lubridate
-    learnr
 License: GPLv3license
 Encoding: UTF-8
 LazyData: true
+Imports: 
+    dplyr
