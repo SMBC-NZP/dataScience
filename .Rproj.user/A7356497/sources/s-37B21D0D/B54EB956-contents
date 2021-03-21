@@ -1,11 +1,15 @@
 Package: dataScience
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Data Science for Ecologists
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
-License: What license is it under?
+Author: Brian S. Evans
+Maintainer: evansbr@si.edu
+Description: 
+    This package contains data and learnr tutorials for learning the essentials of data science with R.
+Imports:
+    tidyverse
+    lubridate
+    learnr
+License: GPLv3license
 Encoding: UTF-8
 LazyData: true
