@@ -2,8 +2,7 @@ Package: dataScience
 Type: Package
 Title: Data Science for Ecologists
 Version: 0.1.0
-Author: Brian S. Evans
-Maintainer: evansbr@si.edu
+Authors@R: person("Brian", "Evans", email = "evansbr@si.edu", role = c("aut", "cre"))
 Description: 
     This package contains data and learnr tutorials for learning the essentials of data science with R.
 License: GPLv3license
