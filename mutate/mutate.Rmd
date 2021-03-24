@@ -1,0 +1,765 @@
+---
+title: "Working with tidy data: Mutate"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(RCurl)
+library(lubridate)
+library(tidyverse)
+knitr::opts_chunk$set(echo = FALSE)
+# gradethis::gradethis_setup()
+
+fractured_fruit <-
+  tibble(
+    fruit_prefix = fruit[1:3] %>%
+      str_sub(1,3), 
+    fruit_suffix = fruit[1:3] %>%
+      str_sub(start =  4),
+    fruit_type = c('pome', 'drupe', 'berry'),
+    consumption_class = c('clean', 'sloppy', 'sloppy'))
+
+long_trees <-
+  tibble(
+    tree_id = 1:5,
+    species = c('Carya glabra', 'Quercus rubra', 'Carya glabra', 'Acer saccharum', 'Acer saccharum'),
+    dbh = c(8, 32, 27, 24, 42),
+    height = c(9, 23, 24, 18, 26)) %>% 
+  pivot_longer(dbh:height, names_to = 'measure', values_to = 'value')
+
+addresses <-
+  tibble(
+    name_last = c('Bonacci', 'Wickham', 'MacArthur', 'Euler'),
+    name_first = c('Leonardo', 'Hadley', 'Robert', 'Leonhard'),
+    address = 
+      c('2358 Rabbit Lane ,Pisa,Italy',
+        '2014 Tidy Cat Boulevard,Aukland, New Zealand',
+        '1958 Warbler Court, Princeton,New Jersey',
+        '7 Bridges Path,Konigsberg,Russia')) %>% 
+  arrange(name_last)
+
+my_covid_garden_sites <-
+  tibble(
+    bed = 1:5,
+    light_access = c('full sun', 'full sun' , 'partial shade', 'full sun', 'shade'),
+    plants = c('jalepenos', 'tomatoes', 'kale', 'summer squash', 'mesclun'))
+
+my_covid_garden_events <-
+  tribble(
+    ~bed, ~date, ~event,
+    1, '2020-04-12', 'planted',
+    1, '2020-05-17', 'weeded',
+    1, '2020-07-16', 'fenced',
+    1, '2020-09-23', 'harvested',
+    2, '2020-04-14', 'planted',
+    2, '2020-05-12', 'weeded',
+    2, '2020-07-14', 'eaten by deer',
+    3, '2020-04-16', 'planted',
+    3, '2020-05-26', 'weeded',
+    3, '2020-06-23', 'eaten by slugs',
+    3, '2020-07-12', 'applied diatomaceous earth',
+    3, '2020-08-07', 'harvested',
+    4, '2020-04-17', 'planted',
+    4, '2020-05-12', 'weeded',
+    4, '2020-07-14', 'trampled by deer',
+    5, '2020-04-03', 'planted',
+    5, '2020-05-19', 'weeded',
+    5, '2020-05-20', 'eaten by squirrels') %>% 
+  arrange(date) %>% 
+  mutate(date = as_date(date))
+
+my_covid_garden <-
+  left_join(
+    my_covid_garden_sites,
+    my_covid_garden_events,
+    by = 'bed')
+
+rm(my_covid_garden_sites)
+
+rm(my_covid_garden_events)
+
+
+urban_sites <-
+  read_csv('data/sites.csv')
+
+messy_weather <-
+  read_csv('../data/messy_weather.csv')
+
+messy_weather_long_days <-
+  pivot_longer(
+    data = messy_weather,
+    cols = march_1:march_31,
+    names_to = "day",
+    values_to = "value",
+    names_prefix = "march_")
+
+messy_weather_date_fix <-
+  unite(
+    messy_weather_long_days,
+    col = 'date',
+    c('year', 'month', 'day'),
+    sep = '-')
+
+messy_weather_wide_weather <-
+  messy_weather_date_fix %>% 
+  pivot_wider(
+    names_from = variable,
+    values_from = value)
+
+messy_weather_temperature_fix <-
+  separate(
+    messy_weather_wide_weather,
+    col = temperature_min_max,
+    into = c('temperature_min', 'temperature_max'),
+    sep = ':')
+
+weather_stations <-
+  distinct(
+    select(
+      messy_weather_temperature_fix,
+      station:name))
+
+observations <-
+  select(
+    messy_weather_temperature_fix,
+    station, date:temperature_max)
+
+monarch_inat <-
+  read_csv('../data/monarch_inat.csv')
+
+multiply_by_two <- 
+  function(x) {
+    x*2
+  }
+
+add_one <- 
+  function(x) {
+    x+1
+  }
+
+messy_weather_temperature_fix <-
+  messy_weather %>% 
+  pivot_longer(
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_') %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE) %>% 
+  pivot_wider(
+    names_from = variable, 
+    values_from = value) %>% 
+  separate(
+    col = temperature_min_max,
+    into = c('temperature_min', 'temperature_max'),
+    sep = ':')
+
+
+weather_stations <-
+  messy_weather_temperature_fix %>% 
+  select(station:name) %>% 
+  distinct()
+
+observations <-
+  messy_weather_temperature_fix %>% 
+  select(station, date:temperature_max)
+```
+
+
+<head>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<link rel="stylesheet" type="text/css" href="../css/styles.css">
+<!-- link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" -->
+<style>
+
+body {
+  font-size: 18px;
+}
+
+.topic {
+  font-size: 19px !important;
+}
+
+code {
+  font-size: 16px !important;
+}
+
+h1 {
+  font-size: 2.25em;
+}
+
+h2 {
+  font-size: 2em;
+}
+
+h3 {
+  font-size: 1.75em;
+}
+
+h4 {
+  font-size: 1.5em;
+}
+
+h5 {
+  font-size: 1.25em;
+}
+
+pre {
+  font-size: 16px !important;
+  margin-top: 2em;
+  margin-bottom: 2em;
+}
+</style>
+</head>
+
+## Overview
+
+<a title = "This is not a pipe">
+  <img  src = "https://upload.wikimedia.org/wikipedia/en/b/b9/MagrittePipe.jpg"
+        alt="Magritte painting, the treachery of images"
+        style = "float: right; padding-left: 3em; padding-bottom: 3em; width: 50%; height: auto;">
+  </img>
+</a>
+
+- **Review**: Object assignment and mutation in base R.
+- **Mutation fundamentals**: Develop a fundamental understanding of how, when, and why to mutate.
+- **Applications**: Some special, oft-used, applications of functions inside of mutate.</li>
+
+<hr>
+
+## Review: Modifying data frames
+
+Consider the line of code below:
+
+```{r, echo = TRUE}
+df <-
+  tibble(
+    j = 'hello', 
+    h = 'world')
+```
+
+<div class = "reviewDiv" style = "margin-top: 2em;">
+<h4><i class="fa fa-user-circle" aria-hidden="true" style = "font-size: 100%"></i> Creating and assigning objects</h4> 
+```{r question_ymd, echo=FALSE}
+question("Which of the following is true about this section of code (choose one or more)?",
+  answer("The assignment operature = is a primitive function", correct = TRUE, message = "There are four functions in this section of code. The assignment operators <- and = are primitive functions and tibble is an R function. Objects j and h are vectors stored inside df but are not directly accessible from the parent environment."),
+  answer("The code contains one function"),
+  answer("The assignment operator <- is a primitive function", correct = TRUE),
+  answer("Object j is a vector stored in the same environment that contains df"),
+  type = 'multiple',
+  allow_retry = TRUE,
+  random_answer_order = TRUE
+)
+```
+</div>
+
+If we wanted to modify a column in the data frame using base R, we use the primitive function `$` to reference the column and the primitive function `<-` to assign a vector of new values:
+
+```{r, echo = TRUE}
+df <-
+  tibble(
+    j = 'hello', 
+    h = 'world')
+
+df$h <- 'howdy'
+
+df
+```
+
+The vector `h` exists inside the environment of the data frame object `df`. It is not directly accessible from the global environment:
+
+```{r, echo = TRUE}
+df <-
+  tibble(
+    j = 'hello', 
+    h = 'world')
+
+df$h <- 'howdy'
+
+exists('h')
+
+df
+```
+
+This is why the `$` operator is used. It references a child object, by name, within the environment of its parent.
+
+We can also use this to add a new child object to the parent. Let's append `df`, adding the column `i`:
+
+```{r, echo = TRUE}
+df <-
+  tibble(
+    j = 'hello', 
+    h = 'world')
+
+df$i <- 'howdy'
+
+df
+```
+
+You can also use the `$` operator and the assignment operator to remove a columm from the data frame:
+
+
+```{r, echo = TRUE}
+df <-
+  tibble(
+    j = 'hello', 
+    h = 'world',
+    i = 'howdy')
+
+df$i <- NULL
+
+df
+```
+
+<hr>
+
+## Introduction to mutate
+
+The `mutate` family of functions in tidyverse (dplyr) gives you the power to add, modify, and delete variables within a data frame. 
+
+The first argument of `mutate` is the data frame you would like to modify. Let's create a data frame as above and add a column using mutate:
+
+```{r, echo = TRUE}
+df <-
+  tibble(
+    j = 'hello', 
+    h = 'world')
+
+mutate(df, i = 'howdy')
+```
+
+In a nested function structure, this would look like this:
+
+```{r, echo = TRUE}
+mutate(
+  tibble(
+    j = 'hello', 
+    h = 'world'),
+  i = 'howdy')
+```
+
+Of course, using the pipe operator `%>%` (CMD+Shift+M or CTRL+Shift+M) would be a more modern way to go about this. Repeat the above using a pipe (do not assign anything):
+
+```{r mutate_start, exercise = TRUE}
+
+```
+
+```{r mutate_start-hint-1}
+tibble(
+  j = 'hello', 
+  h = 'world')
+```
+
+```{r mutate_start-hint-2}
+tibble(
+  j = 'hello', 
+  h = 'world') %>% 
+  mutate(i = 'howdy')
+```
+
+We can also use `mutate` to modify an existing column:
+
+```{r, echo = TRUE}
+mutate(
+  tibble(
+    j = 'hello', 
+    h = 'world'),
+  h = 'howdy')
+```
+
+A benefit to `mutate` is that you choose when you want to modify a variable in your global environment. While this is great from a modern coding perspective, if you're used to assigning intermediate objects, can lead to a lot of head scratching. Note the behavior below:
+
+```{r, echo = TRUE}
+df <-
+  tibble(
+    j = 'hello', 
+    h = 'world')
+
+mutate(
+  df,
+  j = 'boy',
+  h = 'howdy')
+
+df
+```
+
+
+### The environment of mutate
+
+Mutate works within the environment of the data frame being evaluated. This saves lots of writing.
+
+Consider the data frame below. Use base R to add one to each value:
+
+Use base R to create a new column, "c", that multiplies column `b` by two:
+
+```{r no_dollar_base, exercise = TRUE}
+example <-
+  tribble(
+    ~ a, ~ b,
+    1, 1,
+    2, 3)
+```
+
+```{r no_dollar_base-hint-1}
+example <-
+  tribble(
+    ~ a, ~ b,
+    1, 1,
+    2, 3)
+
+example$c
+```
+
+```{r no_dollar_base-hint-2}
+example <-
+  tribble(
+    ~ a, ~ b,
+    1, 1,
+    2, 3)
+
+example$c <- example$b
+```
+
+```{r no_dollar_base-hint-3}
+example <-
+  tribble(
+    ~ a, ~ b,
+    1, 1,
+    2, 3)
+
+example$c <- example$b * 2
+```
+
+Because `mutate` already works within the environment of the data frame we can remove the `$`:
+
+```{r, echo = TRUE}
+tribble(
+    ~ a, ~ b,
+    1, 1,
+    2, 3) %>% 
+  mutate(c = b * 2)
+```
+
+Consider this data frame of iNaturalist observations of Monarch butterflies. The data contain the summed annual observations for a given year and city:
+
+```{r, echo = TRUE}
+monarch_inat
+```
+
+If we wanted to calculate the total across years for each city. In base R this would look like this:
+
+```{r, echo = TRUE}
+monarch_inat$total <-
+  monarch_inat$year_2018 +
+  monarch_inat$year_2019 +
+  monarch_inat$year_2020
+
+monarch_inat
+```
+
+Using a pipe and mutate, create a new column called "total" that is the sum across years for each city:
+
+```{r monarch_inat_sum2, exercise = TRUE}
+
+```
+
+```{r monarch_inat_sum2-hint-1}
+monarch_inat %>% 
+  mutate()
+```
+
+```{r monarch_inat_sum2-hint-2}
+monarch_inat %>% 
+  mutate(total = )
+```
+
+```{r monarch_inat_sum2-hint-3}
+monarch_inat %>% 
+  mutate(total = year_2018 + year_2019 + year_2020)
+```
+
+### Grouping inputs by rows
+
+Why doesn't `sum` work? Let's look at the results of sum:
+
+```{r, echo = TRUE}
+monarch_inat %>% 
+  mutate(total = sum(year_2018, year_2019, year_2020))
+```
+
+Luckily, dplyr has a function called `rowwise` that evaluates a function along a single row at a time. We could apply it here using:
+
+```{r, echo = TRUE}
+monarch_inat %>% 
+  rowwise() %>% 
+  mutate(total = sum(year_2018, year_2019, year_2020))
+```
+
+The function `rowwise` works by breaking a data frame into a group and applying a function to the grouped data. Whenever you do a grouped calculate it's critical to use the function `ungroup` when the grouping is no longer needed:
+
+```{r, echo = TRUE}
+monarch_inat %>% 
+  rowwise() %>% 
+  mutate(total = sum(year_2018, year_2019, year_2020)) %>% 
+  ungroup()
+```
+
+<hr>
+
+## Multiple mutations
+
+What if we wanted to add or modify multiple variables? In base R, this would look like:
+
+```{r, echo = TRUE}
+df <-
+  tibble(
+    j = 'hello', 
+    h = 'world')
+
+df$j <- 'boy'
+
+df$h <- 'howdy'
+
+df
+```
+
+Using `mutate` we simply separate our mutated variables with a comma:
+
+```{r, echo = TRUE}
+tibble(
+  j = 'hello', 
+  h = 'world') %>% 
+  mutate(
+    j = 'boy',
+    h = 'howdy')
+```
+
+### Sequential mutation
+
+Operations can be chained together such that subsequent mutate statements are dependent on the previous value.
+
+Using our monarch iNaturalist data, if we wanted to calculate the proportional contribution of a given year's counts to the total, we could calculate the total across years, as you did above, and pipe the resultant value into a new mutate statement. Here's how it would look for 2020:
+
+
+```{r, echo = TRUE}
+monarch_inat %>% 
+  rowwise() %>% 
+  mutate(total = sum(year_2018, year_2019, year_2020)) %>% 
+  ungroup() %>% 
+  mutate(year_2020 = year_2020/total)
+```
+
+We could also place both operations in the same mutate statement:
+
+```{r, echo = TRUE}
+monarch_inat %>% 
+  rowwise() %>% 
+  mutate(
+    total = sum(year_2018, year_2019, year_2020),
+    year_2020 = year_2020/total) %>% 
+  ungroup()
+```
+
+### Applying the same function to multiple variables
+
+What if we wanted to mutate multiple variables in the same way? If we wanted to repeat the above to see the proportional contribution of year, we could write it like this:
+
+```{r, echo = TRUE}
+monarch_inat %>% 
+  rowwise() %>% 
+  mutate(
+    total = sum(year_2018, year_2019, year_2020),
+    year_2018 = year_2018/total,
+    year_2019 = year_2019/total,
+    year_2020 = year_2020/total) %>% 
+  ungroup()
+```
+
+That's a lot of repetition though, and repetitive code is dangerous code.
+
+We can use `mutate_at` to avoid this. The arguments of `mutate_at` include:
+
+* The name of the data frame
+* The variables you would like to mutate, specified with `vars(name1, name2)`
+* a right hand formula specified with `~` that uses the wildcard `.` in place of the variable name
+
+Here's how it would look:
+
+```{r, echo = TRUE}
+monarch_inat %>% 
+  rowwise() %>% 
+  mutate(total = sum(year_2018, year_2019, year_2020)) %>% 
+  ungroup() %>% 
+  mutate_at(
+    vars(year_2018:year_2020),
+    ~ ./total)
+```
+
+### Conditional mutation
+
+Perhaps you are interested in mutating every numeric variable in the same way. To address this, you can use the function `mutate_if`. The arguments of `mutate_if` include:
+
+* The name of the data frame
+* A logical test for the variable to include (`TRUE` are evaluated)
+* a right hand formula specified with `~` that uses the wildcard `.` in place of the variable name
+
+Let's calculate the proportional contribution of each city to the total annual observations of monarchs:
+
+```{r, echo = TRUE, eval = TRUE}
+monarch_inat %>% 
+  mutate_if(is.numeric, ~ ./sum(.))
+```
+
+Calculate the proportional contribution of each city to monarch for each year and across years:
+
+```{r monarch_final, exercise = TRUE}
+
+```
+
+```{r monarch_final-hint-1}
+monarch_inat
+```
+
+```{r monarch_final-hint-2}
+monarch_inat %>%
+  rowwise()
+```
+
+```{r monarch_final-hint-3}
+monarch_inat %>%
+  rowwise() %>% 
+  mutate(total = sum(year_2018, year_2019, year_2020))
+```
+
+```{r monarch_final-hint-4}
+monarch_inat %>%
+  rowwise() %>% 
+  mutate(total = sum(year_2018, year_2019, year_2020)) %>% 
+  ungroup()
+```
+
+```{r monarch_final-hint-5}
+monarch_inat %>%
+  rowwise() %>% 
+  mutate(total = sum(year_2018, year_2019, year_2020)) %>% 
+  ungroup() %>%  
+  mutate_if(is.numeric, ~ ./sum(.))
+```
+
+## Transmutation
+
+## Applications: Dates
+
+Most (any?) functions that can be applied to an atomic vector can be applied inside of mutate.
+
+The tidyverse package `lubridate` makes dealing with dates easy. If correctly formatted (YYYY-MM-DD), a character date field can be converted into a proper date object using the `as_date` function.
+
+```{r, echo = TRUE, eval = TRUE}
+lubridate::as_date('2021-03-15')
+```
+
+Is all lost if the date was not provided in standard format? No, but you're got a little bit more work to do. The `as_date` function has a `format =` argument where you can specify different date formats. To see the available formats see `?strptime`. Here's an example of changing a date formatted as 3/15/21 (month/day/year) to a conventional date object:
+
+```{r, echo = TRUE, eval = TRUE}
+lubridate::as_date('3/15/21', format = '%m/%d/%y')
+```
+
+**Now you** The weather `observations` data frame we created in our last lesson was pretty tidy, but the fields were not appropriately formatted. 
+
+```{r, echo = TRUE, eval = TRUE}
+glimpse(observations)
+```
+
+Using a piped operation, re-format the date field to a proper date and the weather measures (`precip`, `snow`, `temperature_min`, and `temperature_max`):
+
+```{r observations_date_number, exercise = TRUE}
+
+```
+
+```{r observations_date_number-hint-1}
+observations %>% 
+```
+
+```{r observations_date_number-hint-2}
+observations %>% 
+  mutate(date = lubridate::as_date(date)) %>% 
+```
+
+```{r observations_date_number-hint-3}
+observations %>% 
+  mutate(date = lubridate::as_date(date)) %>% 
+  mutate_at()
+```
+
+```{r observations_date_number-hint-4}
+observations %>% 
+  mutate(date = lubridate::as_date(date)) %>% 
+  mutate_at(
+    vars(precip:temperature_max))
+```
+
+```{r observations_date_number-hint-5}
+observations %>% 
+  mutate(date = lubridate::as_date(date)) %>% 
+  mutate_at(
+    vars(precip:temperature_max),
+    ~ as.numeric(.))
+```
+
+We will deal with dates (and times) much more in-depth in the near future.
+
+## Applications: Strings
+
+Strings are one of the biggest wrangling challenges out there. It's also super important - I use it almost every day. The tidyverse package `stringr` makes dealing with stings pretty straightforward. We will use strings throughout the remainder of our lessons, but here is a few examples to get us started.
+
+### Concatenating strings
+The function `str_c` is used to paste together two strings. Base R has a function, `paste`, that does something similar. Unlike the base function `paste`, `str_c` includes no default separators between strings.
+
+```{r, echo = TRUE, eval = TRUE}
+str_c('apple', 'pie')
+
+paste('apple', 'pie')
+```
+
+A separator between words is added manually, using the `sep =` argument:
+
+```{r, echo = TRUE, eval = TRUE}
+str_c('apple', 'pie', sep = ' ')
+```
+
+### Trimming strings
+The function `str_trim` removes white space around a string.
+
+```{r, echo = TRUE, eval = TRUE}
+str_c(' apple', 'pie', sep = ' ')
+```
+
+
+```{r, echo = TRUE, eval = TRUE}
+str_c(' apple', 'pie', sep = ' ') %>% 
+  str_trim()
+```
+
+### Detecting strings
+The function `str_detect` searches for a string in a vector. It returns `TRUE` if the string is detected and `FALSE` if it is not:
+
+```{r, echo = TRUE, eval = TRUE}
+c('goldfish', 'moldy bread', 'parsley', 'boiled') %>% 
+  str_detect('old')
+```
+
+### Replacing strings
+The 
+
+### Mutate with logic
+
+Two that I use often are `if_else` and `case_when` and are worth giving special here. Both perform logical tests on data and reclassify data based on that test.
+
+For this, we will use the data frame `urban_sites`. These data, from Pharr et al. (*in prep*), provide information on the proportion of impervious surface, noise pollution, and light pollution at a series of sites within metropolitan Washington, DC.
+
+**fin!**

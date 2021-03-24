@@ -1,0 +1,1068 @@
+---
+title: "une pipe"
+output: learnr::tutorial
+runtime: shiny_prerendered
+---
+
+```{r setup, include=FALSE}
+library(learnr)
+library(RCurl)
+library(lubridate)
+library(tidyverse)
+knitr::opts_chunk$set(echo = FALSE)
+# gradethis::gradethis_setup()
+
+# data(messy_weather)
+# 
+messy_weather <-
+  read_csv('../../data/messy_weather.csv')
+
+messy_weather_long_days <-
+  pivot_longer(
+    data = messy_weather,
+    cols = march_1:march_31,
+    names_to = "day",
+    values_to = "value",
+    names_prefix = "march_")
+
+messy_weather_date_fix <-
+  unite(
+    messy_weather_long_days,
+    col = 'date',
+    c('year', 'month', 'day'),
+    sep = '-')
+
+messy_weather_wide_weather <-
+  messy_weather_date_fix %>% 
+  pivot_wider(
+    names_from = variable,
+    values_from = value)
+
+messy_weather_temperature_fix <-
+  separate(
+    messy_weather_wide_weather,
+    col = temperature_min_max,
+    into = c('temperature_min', 'temperature_max'),
+    sep = ':')
+
+weather_stations <-
+  distinct(
+    select(
+      messy_weather_temperature_fix,
+      station:name))
+
+observations <-
+  select(
+    messy_weather_temperature_fix,
+    station, date:temperature_max)
+
+multiply_by_two <- 
+  function(x) {
+    x*2
+  }
+
+add_one <- 
+  function(x) {
+    x+1
+  }
+
+messy_weather_temperature_fix <-
+  messy_weather %>% 
+  pivot_longer(
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_') %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE) %>% 
+  pivot_wider(
+    names_from = variable, 
+    values_from = value) %>% 
+  separate(
+    col = temperature_min_max,
+    into = c('temperature_min', 'temperature_max'),
+    sep = ':')
+
+weather_stations <-
+  messy_weather_temperature_fix %>% 
+  select(station:name) %>% 
+  distinct()
+
+observations <-
+  messy_weather_temperature_fix %>% 
+  select(station, date:temperature_max)
+```
+
+
+<head>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css">
+<link rel="stylesheet" type="text/css" href="../css/styles.css">
+<link rel="icon" 
+      type="image/png" 
+      href = "https://github.com/rstudio/hex-stickers/blob/master/thumbs/pipe.png?raw=true" />
+<!-- link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" -->
+<style>
+
+body {
+  font-size: 18px;
+}
+
+.topic {
+  font-size: 20px !important;
+}
+
+code {
+  font-size: 16px !important;
+}
+
+h1 {
+  font-size: 2.25em;
+}
+
+h2 {
+  font-size: 2em;
+}
+
+h3 {
+  font-size: 1.75em;
+}
+
+h4 {
+  font-size: 1.5em;
+}
+
+h5 {
+  font-size: 1.25em;
+}
+
+pre {
+  font-size: 16px !important;
+  margin-top: 2em;
+  margin-bottom: 2em;
+}
+</style>
+</head>
+
+## Overview
+
+<a title = "This is not a pipe">
+  <img  src = "https://upload.wikimedia.org/wikipedia/en/b/b9/MagrittePipe.jpg"
+        alt="Magritte painting, the treachery of images"
+        style = "float: right; padding-left: 3em; padding-bottom: 3em; width: 50%; height: auto;">
+  </img>
+</a>
+
+* **Review: Functions**: Before starting to use a pipe, it's a good idea to have a clear idea of what a function is.
+* **Review: Nested functions**: The benefits and pitfalls of chained analyses and nested functions.
+* **The pipe!** Nothing has changed coding in R as much as the creation of the pipe. If you don't currently use piping in your code, this lesson will get your code up to the modern era.
+* **Avoiding the pipe**: Pipes sometimes can be avoided. This section tells you when to avoid the pipe (Hadley's position on it at least) and ways that you can do so while maintaining tidy code.
+
+<hr>
+
+## Review: Functions
+
+At its most basic, anything that exists in R is an object and anything that happens is a function (<a href="http://user2014.r-project.org/files/chambers.pdf" target = "_blank">John Chambers, userR!2014</a>). For example, even the assignment operator, `<-` is a function. It **binds** names to a value or values in the current environment. Likewise, the <code>[</code> and <code>]</code> operators that we've used are also functions. These are examples of **primitive functions** ... they call C directly and contain no R code. Herein, I will be referring to functions that are written in R. You can observe the difference by printing a function using `name_of_function`:
+
+        
+```{r, echo = TRUE}
+`<-`
+
+`sd`
+```
+
+An R function has three parts (From Wickham, <a href = "https://adv-r.hadley.nz/" target = "_blank" >Advanced R</a>):
+
+1. <b>formals</b>: A set of controls on the function</li>
+2. <b>body</b>: The set of instructions inside the function</li>
+3. <b>environment</b>: The location of the functions variables</li>
+
+Let's make a simple function called <code>multiple_by_two</code>:
+
+```{r, echo = TRUE}
+multiply_by_two <- 
+  function(x) {
+    x*2
+  }
+```
+
+
+This function takes some value, <code>x</code>, which is defined in the <b>formals</b>, and carries out a set of instructions, <code>x*2</code>, which is defined in the <b>body</b>. We can explore this using the <code>formals</code> and <code>body</code> functions:
+        
+```{r, echo = TRUE}
+formals(multiply_by_two)
+
+body(multiply_by_two)
+```
+
+The environment of the function is actually our global working environment:
+
+```{r, echo = TRUE}
+environment(multiply_by_two)
+```  
+        
+
+There's a catch though! Unless specified otherwise, only the last object in the body will be passed to the global environment. The others only exist in the environment of the functions body. Explore code below. What does the function return? Is `y` in the global environment?
+
+```{r losing_a_y1, exercise = TRUE}
+losing_a_y <- 
+  function(x) {
+    y <- x
+    y*2
+  }
+
+losing_a_y(3)
+```
+
+
+So we can see that a function has its own internal environment, though it works within its parent environment (in this case the global environment). This has been the source of woes for many-an-R-user, but once you get the hang of it, it's an easily avoidable problem. It actually gives you a bit more control on what you're adding to your environment.
+
+When debugging/QCing big functions, I sometimes use <code>return</code> to view values at various points in the <b>body</b>. Explore code below. What does the function return? Is `y` in the global environment?
+
+```{r losing_a_y_return, exercise = TRUE}
+losing_a_y <- 
+  function(x) {
+    y <- x
+    return(y)
+    y*2
+  }
+
+losing_a_y(3)
+```
+
+If you really insist that your environment deserves the intermediate y, you can hard code it in there with `<<-`. Explore code below. What does the function return? Is `y` in the global environment?
+
+```{r  losing_a_y_assign_y, exercise = TRUE}
+losing_a_y <- 
+  function(x) {
+    y <<- x
+    y*2
+  }
+
+losing_a_y(3)
+```
+
+## Review: Nested functions
+
+Functions can be **nested** within the other. Nesting helps avoid assigning intermediate objects -- this reduces the number of objects that are stored in your R environment. An advantage of this is that it also reduces the number of names you have to assign to objects, and, of course, the number of names that you have to remember ("What did I call that ... ?"). We've used nested functions quite a bit throughout this workshop thus far. Let's take a moment to review nested and non-nested versions of functions.
+      
+To illustrate nested and non-nested code-writing, we will conduct the following analysis:
+      
+$$Z_{1} = [1,2,3,4,5]$$
+$$Z_{2} = 2(Z_{1})$$
+$$Z_{3} = Z_{2}+1$$
+      
+Note that the steps in this analysis are **chained** -- each step is dependent on output from the previous step. Let's begin to evaluate these statements by first defining the values for vector my_vector:
+
+```{r, echo = TRUE}
+# Initial values:
+
+my_vector <- 
+  1:5
+```
+  
+Functions for the second and third steps of this process:
+
+```{r, echo = TRUE}
+multiply_by_two <- 
+  function(x) {
+    x*2
+  }
+
+add_one <- 
+  function(x) {
+    x+1
+  }
+```
+    
+To carry out this chained analysis, one non-nested option is to complete the process by assigning a new object for each step. What are the advantages and disadvantages of the below?
+    
+```{r, echo = TRUE}
+# Non-nested, new object for each step:
+
+my_vector <- 
+  1:5
+
+my_vector2 <-
+  multiply_by_two(my_vector)
+
+add_one(my_vector2)
+```
+    
+Another non-nested option is to complete the process by overwriting the origin object for each step. What are the advantages and disadvantages of the below?
+
+```{r, echo = TRUE}
+# Non-nested, overwrite object for each step:
+
+my_vector <- 
+  1:5
+
+my_vector <- 
+  multiply_by_two(my_vector)
+
+add_one(my_vector)
+```
+    
+We can also write the process as **nested** functions. What are the advantages and disadvantages of the below?
+
+```{r, echo = TRUE}
+  # Nested:
+  
+  add_one(
+    multiply_by_two(1:5))
+```
+
+Take a moment to consider the nested and non-nested versions of the process above. Each has its strengths and weaknesses:
+    
+* **Non-nested with new object**:  
+    * Strength: Easy to read.  
+    * Weaknesses: Takes up a lot of script space. Includes an intermediate object assignment (`my_vector`) that may be hard to remember.
+
+* **Non-nested with overwritten object**:  
+    * Strengths: Easy to read. No new names.  
+    * Weaknesses: Takes up a lot of script space. Loss of the initial value of `z` (<i>never, never, never overwrite assigned objects!</i>).
+
+* **Nested**:  
+    * Strengths: Concise. No new names.  
+    * Weaknesses: It can be difficult to read even at modest levels of complexity.
+
+## The Pipe! Introduction
+
+<br>
+<div class = "row">
+<div class = "col-sm-6">
+<img  src = "https://avatars.githubusercontent.com/u/78918?s=460"
+alt="Ben Bolker"
+style = "display: block;
+margin-left: auto;
+margin-right: auto;
+padding-left: 0; 
+padding-bottom: 2em; 
+height:350px; 
+width: auto;">
+</img>
+</div>
+<div class = "col-sm-6">
+<a title = "Pipe operator">
+<img  src = "https://github.com/rstudio/hex-stickers/blob/master/thumbs/pipe.png?raw=true"
+alt="pipe hex"
+style = "display: block;
+margin-left: auto;
+margin-right: auto; 
+padding-left: 1; 
+padding-bottom: 2em; 
+width: auto; 
+height: 350px;">
+</img></a>
+</div>
+</div>
+
+One of the greatest recent advancements in the world of R is the implementation of the **pipe operator**, `%>%`. A **pipe operator** allows you to set the output of one process as the input of another – thus sequences of calculations are chained together without having to define intermediate steps as R objects (Note: Piping is sometimes called chaining). Piping was first implemented in R by quantitative ecologist **Ben Bolker**, in an answer to a question on stackoverflow. Hadley Wickham introduced his version of piping to his dplyr package in 2013 while concurrently **Stefan Milton Bache** developed a more flexible version for his package magrittr (named after Magritte’s painting, The Treachery of Images). In 2014, Wickham and Bache teamed up and Bache’s pipe was incorporated into the tidyverse.
+
+Piping makes scripts more readable and easier to write. Moreover, if you didn’t do a great job naming your R objects, you may have a hard time remembering what each was. The alternative, nested functions, can be problematically complicated to read. Piping avoids the necessity to assign intermediate objects and makes scripts legible by conducting analyses in sequence.
+
+To illustrate what pipe is, let's start return to our simple math problem above.
+      
+We solved this problem using the chained analysis method:
+
+```{r, echo = TRUE}
+my_vector <- 
+  1:5
+
+my_vector2 <-
+  multiply_by_two(my_vector)
+
+add_one(my_vector2)
+```
+
+And the nested analysis method (i.e., a function inside a function):
+
+```{r, echo = TRUE}
+add_one(
+  multiply_by_two(1:5))
+```
+
+The latter is more concise, and avoids unnecessary assignments, but hard to read. This is because the order of operations occurs from the inside (`c(1, 1, 2, 3, 5, 8)`) out. To avoid this, we move the data argument to the top and connect the function and the data with a pipe:
+
+```{r, echo = TRUE}
+1:5 %>% 
+  multiply_by_two() %>% 
+  add_one()
+```
+
+I like to think of this structure like a sentence of sorts. First you introduce the subject of the sentence (the object being modified) and then the functions, which are like verbs that modify the subject. You would read the above from top-to-bottom like this: "I created a vector of values, then multiplied each value by two and added one to the result." That's a lot more straightforward than the nested version: "I applied a function that adds one to the result of the multiplication of a set of values by two." That's barely understandable at all. It forces the reader (often you) to embark on a Q&A session with poorly written code -- "What did you do?" ... "I added one to the result" ... "Of what? ..." 
+
+We'll get a real sense of how the pipe works by applying it to common coding tasks. Soon, our days of confusing, illegibly nested code will be well behind us!
+
+<div class = "row">
+<img  id="gif" 
+src="https://media1.giphy.com/media/Ys9SXSEczO5nW/200w.webp?cid=790b7611f5ed7acc81331d95a52d2cc6898370c68c1f3422&amp;rid=200w.webp&amp;ct=g" 
+srcset="https://media1.giphy.com/media/Ys9SXSEczO5nW/200w.webp?cid=790b7611f5ed7acc81331d95a52d2cc6898370c68c1f3422&amp;rid=200w.webp&amp;ct=g 200w,https://media1.giphy.com/media/Ys9SXSEczO5nW/giphy.webp?cid=790b7611f5ed7acc81331d95a52d2cc6898370c68c1f3422&amp;rid=giphy.webp&amp;ct=g 480w," 
+width="50%" 
+alt=""
+style = "display: block;
+margin-left: auto;
+margin-right: auto;">
+</div>
+
+## The pipe in practice
+
+Let's explore piping using the NOAA weather data from the previous problem set. The dataset contains weather records for the month of March (2010-2020) for several US climate monitoring stations. The format of the data breaks every one of the Tidy data rule:
+
+```{r, eval = TRUE, echo = FALSE}
+messy_weather
+```
+ 
+We were tasked with normalizing the data. Let's step through those steps using non-nested functions and assignment operators. We'll start with dealing with the day columns, which violates Codd's first normal and Hadley's "Each variable forms a column":
+
+```{r, eval = FALSE, echo = TRUE}
+messy_weather_long_days <- 
+  pivot_longer(
+    data = messy_weather,
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_')
+
+messy_weather_long_days
+```   
+
+If we wanted to pipe this statement, we remove the data argument (the first in all of the tidyverse functions) and pipe from the initial tibble:
+
+```{r, eval = FALSE, echo = TRUE}
+messy_weather %>% 
+  pivot_longer(
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_')
+```    
+
+Next, we will deal with the year, month, and day columns, which also violate Codd's first normal and Hadley's "Each variable forms a column":
+
+```{r, eval = TRUE, echo = TRUE}
+messy_weather_date_fix <-
+  unite(
+    messy_weather_long_days,
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE)
+
+messy_weather_date_fix
+```  
+
+Use a pipe to unite the year month and day columns of `messy_weather_long_days`:
+
+```{r ymd, exercise = TRUE}
+
+```   
+
+```{r ymd-hint-1}
+messy_weather_long_days %>% 
+```   
+
+```{r ymd-hint-2}
+messy_weather_long_days %>% 
+  unite()
+```   
+
+```{r ymd-hint-3}
+messy_weather_long_days %>% 
+  unite(
+    c('year', 'month', 'day'))
+```   
+
+```{r ymd-hint-4}
+messy_weather_long_days %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date')
+```   
+
+```{r ymd-hint-5}
+messy_weather_long_days %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-')
+```   
+
+```{r ymd-hint-6}
+messy_weather_long_days %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE)
+```   
+
+Now, we can see that observations are stored in more than one row. We can address this by:
+
+```{r, eval = FALSE, echo = TRUE}
+messy_weather_wide_weather <-
+  pivot_wider(
+    messy_weather_date_fix,
+    names_from = variable, 
+    values_from = value)
+
+messy_weather_wide_weather
+```  
+
+Reproduce the above using a pipe and the tibble `messy_weather_date_fix`:
+
+```{r pivot_wider, exercise = TRUE}
+
+```  
+
+```{r pivot_wider-hint-1}
+messy_weather_date_fix %>% 
+```  
+
+```{r pivot_wider-hint-2}
+messy_weather_date_fix %>% 
+  pivot_wider()
+```  
+
+```{r pivot_wider-hint-3}
+messy_weather_date_fix %>% 
+  pivot_wider(
+    names_from = variable)
+```  
+
+```{r pivot_wider-hint-4}
+messy_weather_date_fix %>% 
+  pivot_wider(
+    names_from = variable, 
+    values_from = value)
+```  
+  
+This shows that the temperature data is actually two variables smushed together into the same cell. We can address this by:
+
+```{r, eval = FALSE, echo = TRUE}
+messy_weather_temperature_fix <-
+  separate(
+    messy_weather_wide_weather,
+    col = temperature_min_max,
+    into = c('temperature_min', 'temperature_max'),
+    sep = ':')
+
+messy_weather_temperature_fix
+``` 
+
+Reproduce the above using a pipe and the tibble `messy_weather_wide_weather`:
+
+```{r separate, exercise = TRUE}
+
+``` 
+
+```{r separate-hint-1}
+messy_weather_wide_weather %>% 
+  separate()
+``` 
+
+```{r separate-hint-2}
+messy_weather_wide_weather %>% 
+  separate(
+    col = temperature_min_max)
+``` 
+
+```{r separate-hint-3}
+messy_weather_wide_weather %>% 
+  separate(
+    col = temperature_min_max,
+    into = c('temperature_min', 'temperature_max'))
+``` 
+
+```{r separate-hint-4}
+messy_weather_wide_weather %>% 
+  separate(
+    col = temperature_min_max,
+    into = c('temperature_min', 'temperature_max'),
+    sep = ':')
+``` 
+
+Our final step in tidying is dealing with the levels of observation. We can see that some of the data were collected at the site level, while others represent the daily observations. 
+
+To generate a tibble of observations, we use `select` to subset the data to just the columns that represent daily weather observations (and the **station** foreign key):
+
+```{r, eval = FALSE, echo = TRUE}
+observations <-
+  select(
+    messy_weather_temperature_fix, 
+    station, date:temperature_max)
+```
+
+Reproduce the above using a pipe and the tibble `messy_weather_temperature_fix`:
+
+```{r select, exercise = TRUE}
+observations <-
+  messy_weather_temperature_fix %>% 
+  select(station, date:temperature_max)
+```
+
+For the station level data, we've got a bit more of a challenge. Simply selecting the data associated with the station generates duplicate columns:
+
+```{r, eval = TRUE, echo = TRUE}
+weather_stations <-
+    select(
+      messy_weather_temperature_fix, 
+      station:name)
+```
+
+To address this, we need to use the function `distinct`. We could do this with a chained analysis:
+
+```{r, eval = TRUE, echo = TRUE}
+weather_stations_duplicates <-
+    select(
+      messy_weather_temperature_fix, 
+      station:name)
+
+weather_stations <-
+  distinct(weather_stations_duplicates)
+
+weather_stations
+```
+
+Or, if we want to avoid assigning an intermediate object to our global environment, a nested analysis:
+
+```{r, eval = TRUE, echo = TRUE}
+weather_stations <-
+  distinct(
+    select(
+      messy_weather_temperature_fix, 
+      station:name))
+
+weather_stations
+```
+
+Because the data argument of `distinct` is the data generated using `select` these analyses can be chained together with a pipe. Try reproducing the above using a pipe rather than a nested function: 
+
+```{r select_distinct, exercise = TRUE}
+
+``` 
+
+```{r select_distinct-hint-1}
+weather_stations <-
+``` 
+
+```{r select_distinct-hint-2}
+weather_stations <-
+  messy_weather_temperature_fix %>% 
+``` 
+
+```{r select_distinct-hint-3}
+weather_stations <-
+  messy_weather_temperature_fix %>% 
+  select(station:name) %>% 
+``` 
+
+```{r select_distinct-hint-4}
+weather_stations <-
+  messy_weather_temperature_fix %>% 
+  select(station:name) %>% 
+  distinct()
+``` 
+  
+## Piping multiple operations
+
+Consider our first operation, in which we used `pivot_longer` to create the object we called "messy_weather_long_days". Will we use `messy_weather_long_days` in the future? I don't imagine so.
+
+Recall that "messy_weather_long_days" is just the name that we used to bind the object to our global environment. It's not the object itself. The object that `messy_weather_long_days` represents was created when we applied our `pivot_longer` function to `messy_weather`. Because of this, the following two statements generate equivalent results:
+
+```{r, eval = FALSE, echo = TRUE}
+messy_weather_long_days <- 
+  pivot_longer(
+    data = messy_weather,
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_')
+
+messy_weather_long_days %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE)
+```
+
+```{r, eval = FALSE, echo = TRUE}
+messy_weather %>% 
+  pivot_longer(
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_') %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE)
+```
+
+We can, of course, pipe the process throughout. Here is what the whole process looks like without pipes:
+
+```{r, message = FALSE, eval = FALSE, echo = TRUE}
+messy_weather_long_days <- 
+  pivot_longer(
+    data = messy_weather,
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_')
+
+messy_weather_date_fix <-
+  unite(
+    messy_weather_long_days,
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE)
+
+messy_weather_wide_weather <-
+  pivot_wider(
+    messy_weather_date_fix,
+    names_from = variable, 
+    values_from = value)
+
+messy_weather_temperature_fix <-
+  separate(
+    messy_weather_wide_weather,
+    col = temperature_min_max,
+    into = c('temperature_min', 'temperature_max'),
+    sep = ':')
+
+weather_stations <-
+  distinct(
+    select(
+      messy_weather_temperature_fix, 
+      station:name))
+
+observations <-
+  select(
+    messy_weather_temperature_fix, 
+    station, date:temperature_max)
+``` 
+  
+If we intended to use the intermediate objects, then the above is okay. If we don't intend to use those objects again, it makes more sense to pipe the entire operation. Otherwise we accumulate a bunch of junk in our global environment. 
+
+Repeat the process above, but this time only generate one intermediate object -  `messy_weather_temperature_fix` (which is used to generate the `weather_stations` and `observations` tibbles):
+
+```{r full_process_piped, exercise = TRUE}
+messy_weather_temperature_fix <-
+  messy_weather
+
+weather_stations <-
+  messy_weather_temperature_fix
+
+observations <-
+  messy_weather_temperature_fix
+``` 
+
+
+```{r full_process_piped-hint-1, eval = FALSE}
+messy_weather_temperature_fix <-
+  messy_weather %>% 
+  pivot_longer(
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_')
+
+weather_stations <-
+  messy_weather_temperature_fix
+
+observations <-
+  messy_weather_temperature_fix
+``` 
+
+
+```{r full_process_piped-hint-2, eval = FALSE}
+messy_weather_temperature_fix <-
+  messy_weather %>% 
+  pivot_longer(
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_') %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE)
+
+weather_stations <-
+  messy_weather_temperature_fix
+
+observations <-
+  messy_weather_temperature_fix
+``` 
+
+
+```{r full_process_piped-hint-3, eval = FALSE}
+messy_weather_temperature_fix <-
+  messy_weather %>% 
+  pivot_longer(
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_') %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE)
+
+weather_stations <-
+  messy_weather_temperature_fix
+
+observations <-
+  messy_weather_temperature_fix
+``` 
+
+
+```{r full_process_piped-hint-4, eval = FALSE}
+messy_weather_temperature_fix <-
+  messy_weather %>% 
+  pivot_longer(
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_') %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE) %>% 
+  pivot_wider(
+    names_from = variable, 
+    values_from = value)
+
+weather_stations <-
+  messy_weather_temperature_fix
+
+observations <-
+  messy_weather_temperature_fix
+``` 
+
+
+```{r full_process_piped-hint-5, eval = FALSE}
+messy_weather_temperature_fix <-
+  messy_weather %>% 
+  pivot_longer(
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_') %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE) %>% 
+  pivot_wider(
+    names_from = variable, 
+    values_from = value) %>% 
+  separate(
+    col = temperature_min_max,
+    into = c('temperature_min', 'temperature_max'),
+    sep = ':')
+
+weather_stations <-
+  messy_weather_temperature_fix
+
+observations <-
+  messy_weather_temperature_fix
+``` 
+
+
+```{r full_process_piped-hint-6, eval = FALSE}
+messy_weather_temperature_fix <-
+  messy_weather %>% 
+  pivot_longer(
+    cols = march_1:march_31, 
+    names_to = 'day', 
+    values_to = 'value', 
+    names_prefix = 'march_') %>% 
+  unite(
+    c('year', 'month', 'day'), 
+    col = 'date', 
+    sep = '-',
+    na.rm = TRUE) %>% 
+  pivot_wider(
+    names_from = variable, 
+    values_from = value) %>% 
+  separate(
+    col = temperature_min_max,
+    into = c('temperature_min', 'temperature_max'),
+    sep = ':')
+
+weather_stations <-
+  messy_weather_temperature_fix %>% 
+  select(station:name) %>% 
+  distinct()
+
+observations <-
+  messy_weather_temperature_fix %>% 
+  select(station, date:temperature_max)
+``` 
+
+## Piping "legacy" functions
+
+Most modern R functions have data as their first argument. This is very useful for constructing piped operations. Many functions, especially older functions, do not have data as the first argument. I call these "legacy" functions out of convenience, but there are lots of modern functions for which this is the case. We can still pipe them though!
+
+To pipe a function in which data is not the first argument, take a look at the function's arguments with `formals([function_name])`. Use `formals` to see the arguments for `stats::lm` (linear model):
+
+```{r formals, exercise = TRUE}
+
+```
+
+```{r formals-hint-1}
+formals(lm)
+```
+
+Notice that data is actually the second argument of the function! The first argument is the formula used (typically `y ~ x`).
+
+To create a linear model, you would typically specify `lm(y ~ x, data = [my_data_frame])`.
+
+Let's use `weather_stations` to create a linear model to examine whether elevation varies as a function of latitude:
+
+```{r, echo = TRUE, eval = TRUE}
+lm(elevation ~ latitude, data = weather_stations)
+```
+
+To send the output of a pipe to an argument that is not first in the formals, we replace the data argument with a `.`:
+
+```{r, echo = TRUE, eval = TRUE}
+weather_stations %>% 
+  lm(elevation ~ latitude, data = .)
+```
+
+This is great for initial model exploration. For example, I often use the following structure when playing with linear models. The `lm` function generates a linear model object, which is the argument for the `summary` function, so it works perfectly with a pipe:
+
+```{r, echo = TRUE, eval = TRUE}
+weather_stations %>% 
+  lm(elevation ~ latitude, data = .) %>% 
+  summary()
+```
+
+## Avoiding the pipe
+
+Sometimes piping isn't ideal. In his book "<a href = "https://r4ds.had.co.nz/index.html" target = "_blank">R for Data Science</a>" Hadley Wickham provides the following suggestions for when **not** to use the pipe (page 266):
+
+* Your pipes are longer than (say) ten steps. In that case, create intermediate objects with meaningful names. That will make debugging easier, because you can more easily check the intermediate results, and it makes it easier to understand your code, because the variable names can help communicate intent.
+* You have multiple inputs or outputs. If there isn’t one primary object being transformed, but two or more objects being combined together, don’t use the pipe.
+* You are starting to think about a directed graph with a complex dependency structure. Pipes are fundamentally linear and expressing complex relationships with them will typically yield confusing code.
+
+I don't entirely agree with the second point, but it's useful to consider.
+
+But how do you manage a clean global environment without piping?
+
+### Removing objects
+
+One option for having a clean global environment without pipes is to use the function `rm` to remove objects that will no longer be used. To remove an object from your environment simply supply the name that you assigned to the object. We'll use the function `exists` to test whether the object is in the global environment:
+
+```{r, echo = TRUE, error = TRUE}
+exists('b')
+
+b <- 1
+
+exists('b')
+
+rm(b)
+
+exists('b')
+```
+
+You can use the function `ls` to view the objects in your environment. Let's list the current objects in the environment, then add and remove `b`, as above:
+
+```{r, echo = TRUE, error = TRUE}
+ls()
+
+b <- 1
+
+ls()
+
+rm(b)
+
+ls()
+```
+
+**The danger of rm**: The one drawback of this method that I've found while wrangling is that I sometimes have to re-create the objects that I removed. For example, though I was sure I was done with `messy_weather_long_days` for good, there was some aspect that required a second look. Because I removed the object, I would have to run the code again to explore that version of the data.
+
+### Working in a new environment
+
+Another option is to create a new environment for storing your intermediate steps. You can create an environment using the `new.env` function. We'll create a new environment called `tidying`. We'll then add `envir = tidying` to `exists` to see whether our test object is in the environment that we created:
+
+```{r, echo = TRUE, error = TRUE}
+exists('b')
+
+tidying <- 
+  new.env()
+
+class(tidying)
+
+tidying$b <- 1
+
+exists('b')
+
+exists('b', envir = tidying)
+```
+
+We can remove objects from an environment using `rm` by specifying the name of the environment in our function call:
+
+```{r, echo = TRUE, error = TRUE}
+
+tidying <- 
+  new.env()
+
+tidying$b <- 1
+
+ls(tidying)
+
+exists('b', envir = tidying)
+
+rm('b', envir = tidying)
+
+exists('b', envir = tidying)
+```
+
+We can also remove the whole child environment at once:
+
+```{r, echo = TRUE, error = TRUE}
+
+tidying <- 
+  new.env()
+
+exists('tidying')
+
+rm(tidying)
+
+exists('tidying')
+```
+
+This is a handy way to keep your tidying code and global environment clean without necessitating piping. What I like about this method is that I can store my intermediate objects for as long as needed. I can explore the intermediate steps after I make them without cluttering up my global environment. I will only delete my custom environment when I am totally sure that I will not need the objects it contains.
+
+You can even save your custom environments (though I wouldn't generally use it to save intermediate steps) using the `save` function  by specifying the name of the environment and the file name (*note: you can save other types of objects this way too!*). I really do not recommend this though, unless there is considerable processing time associated with your wrangling steps (example only, do not run):
+
+```{r, echo = TRUE, eval = FALSE}
+
+tidying <- 
+  new.env()
+
+save(tidying, file = `tidying.RData`)
+```
+
+<hr>
+
+Use a pipe whenever possible but there's no hard-and-fast rules about when you should assign objects to an environment (whether the global environment or a custom environment). What's critical is developing code that:
+
+* Works as expected
+* Clearly communicates each step
+* Maintains a clean and organized global environment
+
+<hr>
+
+**fin!**
